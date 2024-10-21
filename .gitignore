@@ -9,13 +9,13 @@ dev.env
 .env.staging
 .env.staging.db
 .venv
+.cp-venv/
 env/
 venv/
-.zagent-venv/
 ENV/
 env.bak/
 venv.bak/
-span-venv/
+
 
 # Django stuff:
 *.log
@@ -29,3 +29,5 @@ env.dev
 .vscode/settings.json
 celerybeat-schedule
 .env.prod
+model_data/
+.byaldi/

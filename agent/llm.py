@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 
@@ -17,7 +18,7 @@ class LlmClient:
         self.client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1", api_key=settings.OPENROUTER_API_KEY
         )
-        self.begin_sentence = """Hi there! My name is Amy, and I'm a your AI assistant. I'm here to help you with any questions you might have about your documents. How can I assist you today?"""
+        self.begin_sentence = """Hi there!I'm a your AI Healthcare policies assistant. I'm here to help you with any questions you might have about your organization documents. How can I assist you today?"""
         self.agent_prompt = PROMPT
 
     def prepare_functions(self):
@@ -60,14 +61,78 @@ class LlmClient:
     async def draft_response(self, request):
         func_call = {}
         func_arguments = ""
-        request_with_context = await self.get_context(request)
+        messages = request["messages"]
+        context = await self.get_context(request)
+        first_message = True
+        if context:
+            query = request["messages"][-1]["content"]
+            yield {
+                "response_id": int(request["response_id"]) + 1,
+                "content": "Here are the top 3 results I found for you:",
+                "content_complete": False,
+                "first_message": first_message,
+                "role": "assistant",
+                "image": False,
+            }
+            first_message = False
+            for c in context:
+                yield {
+                    "response_id": int(request["response_id"]) + 1,
+                    "content": c["metadata"],
+                    "content_complete": False,
+                    "first_message": first_message,
+                    "role": "assistant",
+                    "image": c["base64"],
+                }
+                await asyncio.sleep(0.1)
+            yield {
+                "response_id": int(request["response_id"]) + 1,
+                "content": """Now, I will analyse the content of the documents and provide you with the information you need.
+                <div class="relative flex py-5 items-center">
+                <div class="flex-grow border-t border-gray-400"></div>
+                <span class="flex-shrink mx-4 text-gray-400">Analysis</span>
+                <div class="flex-grow border-t border-gray-400"></div>
+                </div>
+                """,
+                "content_complete": False,
+                "first_message": first_message,
+                "role": "assistant",
+                "image": False,
+            }
+
+            content = [
+                {
+                    "type": "text",
+                    "text": f"""Use the following images as a reference to answer the following user questions: {query}. 
+            """,
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": context[0]["base64"]},
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": context[1]["base64"]},
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": context[2]["base64"]},
+                },
+            ]
+            last_message = messages[-1]
+            last_message["content"] = content
+            # pop the last message and append the new message
+            messages.pop()
+            messages.append(last_message)
+            request["messages"] = messages
+
+
         stream = await self.client.chat.completions.create(
-            model="google/gemini-pro-1.5",
-            messages=request_with_context["messages"],
+            model="openai/gpt-4o-2024-08-06",
+            messages=request["messages"],
             stream=True,
             # tools=self.prepare_functions(),
         )
-        first_message = True
         async for chunk in stream:
             if chunk.choices[0].delta.tool_calls:
                 tool_calls = chunk.choices[0].delta.tool_calls[0]
@@ -86,7 +151,7 @@ class LlmClient:
 
             if chunk.choices[0].delta.content:
                 yield {
-                    "response_id": int(request_with_context["response_id"]) + 1,
+                    "response_id": int(request["response_id"]) + 1,
                     "content": chunk.choices[0].delta.content,
                     "content_complete": False,
                     "first_message": first_message,
@@ -108,7 +173,7 @@ class LlmClient:
                     content = "I have sent you an SMS with a video link that will show you how to inject the medicine. Please check your phone. Here is the link: dummy link"
 
                 yield {
-                    "response_id": int(request_with_context["response_id"]) + 1,
+                    "response_id": int(request["response_id"]) + 1,
                     "content": content,
                     "content_complete": True,
                     "first_message": first_message,
@@ -117,7 +182,7 @@ class LlmClient:
             # Add more functions here
         else:
             yield {
-                "response_id": int(request_with_context["response_id"]) + 1,
+                "response_id": int(request["response_id"]) + 1,
                 "content": "",
                 "content_complete": True,
                 "first_message": first_message,
@@ -158,19 +223,10 @@ class LlmClient:
         that came from a RAG pipelines
         """
         messages = request["messages"]
-        last_message = messages[-1]
         context = None
+        last_message = messages[-1]
         if last_message["role"] == "user":
-            context = await run_rag_pipeline(messages)
+            # run_rag_pipline is synchronous, so we need to await it
+            context = await asyncio.to_thread(run_rag_pipeline, messages)
 
-        # if you don't have a rag pipeline, it will always be None, so this function will always return the request as is
-        if context:
-            last_message["content"] = (
-                f"{last_message['content']}\n Background information: {context}"
-            )
-            # pop the last message and append the new message
-            messages.pop()
-            messages.append(last_message)
-            request["messages"] = messages
-
-        return request
+        return context

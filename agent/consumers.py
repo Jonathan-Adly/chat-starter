@@ -91,32 +91,55 @@ class LLMWebsocketChatConsumer(AsyncWebsocketConsumer):
         first_message = text_data_json["first_message"]
         content_complete = text_data_json["content_complete"]
         role = text_data_json["role"].title()
+        image = text_data_json.get("image", None)
         if role == "Assistant":
             outer_div = self.dynamic_classes.get("assistant_outdiv", "")
             inner_div = self.dynamic_classes.get("assistant_innerdiv", "")
             p_style = self.dynamic_classes.get("assistant_p_style", "")
+                
         else:
             outer_div = self.dynamic_classes.get("user_outdiv", "")
             inner_div = self.dynamic_classes.get("user_innerdiv", "")
             p_style = self.dynamic_classes.get("user_p_style", "")
+        
+        image_container_style = self.dynamic_classes.get("image_container_style", "")
+        image_style = self.dynamic_classes.get("image_style", "")
+        image_caption = self.dynamic_classes.get("image_caption", "")
         # in the case of the first message, we add a new div to the message log
         if first_message:
             # previous div was chat-0, so we increment by 1
             chat_id = f"chat-{response_id + 1}"
             template = f"""<div id="messageLog" hx-swap-oob="beforeend">
-                <div class="{outer_div}">
-                    <div class="{inner_div}">
-                        <p id="{chat_id}" class="{p_style}"><strong> {role}:</strong> {content}</p>
+              <div class="{outer_div}">
+                <div class="{inner_div}">
+                    <div>
+                        <p class="font-semibold text-gray-800 mb-2">{role}</p>
+                       <div id="{chat_id}"class="{p_style}">{content}</div>
                     </div>
                 </div>
             </div>
                 """
         else:
-            # not a first message, so we append content to the <p> tag with the id chat-{response_id}
+             # not a first message, so we append content to the <p> tag with the id chat-{response_id}
             chat_id = f"chat-{response_id + 1}"
-            template = f"""<p id={chat_id} hx-swap-oob="beforeend">{content}</p>"""
+            if image:
+                template = f"""
+                <div id={chat_id} hx-swap-oob="beforeend">
+                         <div class="{image_container_style}">
+                            <img
+                                alt="Uploaded document"
+                                src="{image}"
+                                class="{image_style}"
+                            />
+                            <p class="{image_caption}">{content}</p>
+                        </div>
+                </div>
+                """
+            
+            else:
+                template = f"""<div id={chat_id} hx-swap-oob="beforeend">{content}</div>"""
 
-        if content_complete:
+        if content_complete and not image:
             response_id += 1
             template = (
                 template

@@ -1,0 +1,10 @@
+[project]
+name = "colpali-demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+"Django==5.0.7", "psycopg[binary]==3.2.1", "environs[django]==11", "servestatic==1.0.0", "django-tailwind-cli==2.13.0",
+"django-phonenumber-field[phonenumberslite]==8.0.0", "channels[daphne]==4.1.0", "channels-redis==4.2.0", 
+"openai==1.35.15", "twilio==9.2.3", "django-phonenumber-field[phonenumberslite]==8.0.0", "colivara_py"]
