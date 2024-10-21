@@ -1,0 +1,38 @@
+version: "3.9"
+services:
+  web:
+    build: .
+    ports:
+       - "8001:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/code
+    depends_on:
+      - db
+    env_file:
+      - ./.env.dev
+  
+  db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - "POSTGRES_HOST_AUTH_METHOD=trust"
+  
+  tailwind-sidecar:
+    build: .  
+    command: python manage.py tailwind watch
+    tty: true
+    volumes:
+      - .:/code 
+    env_file:
+      - ./.env.dev
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+
